@@ -172,7 +172,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
                   const SizedBox(height: 15),
 
-                  _buildInputCard("Menu", "📚", Colors.purpleAccent),
+                  _buildInputCard("Menu", "📚", Colors.green),
                 ],
               ),
             ),
