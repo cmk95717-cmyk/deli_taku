@@ -41,10 +41,65 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   // ここに変数を定義します（合計金額など）
 
   int totalEarnings = 0;
+  final int dailyGoal = 15000;
+
+  // すでにあるフォーマッター
+  final formatter = NumberFormat("#,###");
+
+  // 【1. 記憶する】
+  // 各入力欄の文字を管理する「コントローラー」を作ります。
+  // これがないと、TextFieldに入力された文字をプログラム側で読み取れません。
+  final _uberController = TextEditingController();
+  final _demaeController = TextEditingController();
+  final _woltController = TextEditingController();
+  final _rocketController = TextEditingController();
+  final _menuController = TextEditingController();
+
+  // 【2. 計算する】
+  // コントローラーから文字を取り出し、数字に変換して足し算します。
+  void _calculateTotal() {
+    // .text で入力されている文字を取得し、
+    // int.tryParse で数字に変換します（空欄や文字なら 0 になるように ?? 0 をつける）
+    int uber = int.tryParse(_uberController.text) ?? 0;
+    int demae = int.tryParse(_demaeController.text) ?? 0;
+    int wolt = int.tryParse(_woltController.text) ?? 0;
+    int rocket = int.tryParse(_rocketController.text) ?? 0;
+    int menu = int.tryParse(_menuController.text) ?? 0;
+
+    // setState で「画面を更新して！」とFlutterに伝えます。
+    // これを忘れると、計算はされるけど画面の数字が変わりません。
+    setState(() {
+      totalEarnings = uber + demae + wolt + rocket + menu;
+    });
+  }
+
+  // 【3. リセットする】
+  // 全部空っぽにして、合計も0にします。
+  void _resetAll() {
+    setState(() {
+      _uberController.clear();
+      _demaeController.clear();
+      _woltController.clear();
+      _rocketController.clear();
+      _menuController.clear();
+      totalEarnings = 0;
+    });
+  }
+
+  // 【4. 片付ける】
+  // アプリの画面が破棄されるとき（メモリ節約のため）にコントローラーも捨てます。
+  // これはお作法として必ず書くようにしましょう。
+  @override
+  void dispose() {
+    _uberController.dispose();
+    _demaeController.dispose();
+    _woltController.dispose();
+    _rocketController.dispose();
+    _menuController.dispose();
+    super.dispose();
+  }
 
   // 金額表示用のフォーマッター (例: 1,200)
-
-  final formatter = NumberFormat("#,###");
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +149,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                         height: 150,
 
                         child: CircularProgressIndicator(
-                          value: 0.7, // 仮の値：70%達成
+                          value: 0, // 仮の値：70%達成
 
                           strokeWidth: 10,
 
@@ -137,7 +192,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   const SizedBox(height: 20),
 
                   const Text(
-                    "目標まであと ¥3,000",
+                    "頑張ったね！",
 
                     style: TextStyle(color: Colors.white, fontSize: 16),
                   ),
@@ -156,23 +211,33 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               child: Column(
                 children: [
                   // ここに各社のカードを並べます
-                  _buildInputCard("Uber Eats", "🐸", Colors.green),
+                  _buildInputCard(
+                    "Uber Eats",
+                    "🐸",
+                    Colors.green,
+                    _uberController,
+                  ),
 
                   const SizedBox(height: 15),
 
-                  _buildInputCard("出前館", "🥫", Colors.red),
+                  _buildInputCard("出前館", "🥫", Colors.red, _demaeController),
 
                   const SizedBox(height: 15),
 
-                  _buildInputCard("Wolt", "🦌", Colors.blue),
+                  _buildInputCard("Wolt", "🦌", Colors.blue, _woltController),
 
                   const SizedBox(height: 15),
 
-                  _buildInputCard("Rocket Now", "🚀", Colors.orange),
+                  _buildInputCard(
+                    "Rocket Now",
+                    "🚀",
+                    Colors.orange,
+                    _rocketController,
+                  ),
 
                   const SizedBox(height: 15),
 
-                  _buildInputCard("Menu", "📚", Colors.green),
+                  _buildInputCard("Menu", "📚", Colors.green, _menuController),
                 ],
               ),
             ),
@@ -207,7 +272,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   // カードを生成するウィジェット（コードを見やすくするため切り出し）
 
-  Widget _buildInputCard(String title, String emoji, Color accentColor) {
+  Widget _buildInputCard(
+    String title,
+    String emoji,
+    Color accentColor,
+    TextEditingController controller,
+  ) {
     return Card(
       elevation: 4, // 影の強さ
 
@@ -257,6 +327,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               width: 100,
 
               child: TextField(
+                controller: controller,
                 keyboardType: TextInputType.number,
 
                 textAlign: TextAlign.right,
@@ -283,9 +354,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   ),
                 ),
 
-                onChanged: (value) {
-                  // ここで計算ロジックを呼び出す
-                },
+                onChanged: (value) => _calculateTotal(),
+                // ここで計算ロジックを呼び出す
               ),
             ),
           ],
