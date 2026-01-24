@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:intl/intl.dart';
 
-// import 'package:shared_preferences/shared_preferences.dart'; // 後で使います
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const MyApp());
@@ -71,6 +71,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     setState(() {
       totalEarnings = uber + demae + wolt + rocket + menu;
     });
+    _saveData();
   }
 
   // 【3. リセットする】
@@ -84,6 +85,44 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       _menuController.clear();
       totalEarnings = 0;
     });
+    _saveData();
+  }
+
+  // 【データを保存する機能】
+  // 計算するたびに、この関数を呼んでスマホに数字を書き込みます
+  Future<void> _saveData() async {
+    final prefs = await SharedPreferences.getInstance();
+    // キーワード（'uber'など）を決めて、それぞれの数字を保存
+    await prefs.setInt('uber', int.tryParse(_uberController.text) ?? 0);
+    await prefs.setInt('demae', int.tryParse(_demaeController.text) ?? 0);
+    await prefs.setInt('wolt', int.tryParse(_woltController.text) ?? 0);
+    await prefs.setInt('rocket', int.tryParse(_rocketController.text) ?? 0);
+    await prefs.setInt('menu', int.tryParse(_menuController.text) ?? 0);
+    // 日付も保存しておくと、あとで「日付が変わったらリセット」ができます（今回はまだ数字だけ）
+  }
+
+  // 【データを読み込む機能】
+  // アプリが起動した瞬間に、保存されていた数字を取り出して画面に戻します
+  Future<void> _loadData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      // 保存された数字を取り出す（もし無ければ 0 を入れる）
+      _uberController.text = (prefs.getInt('uber') ?? 0).toString();
+      _demaeController.text = (prefs.getInt('demae') ?? 0).toString();
+      _woltController.text = (prefs.getInt('wolt') ?? 0).toString();
+      _rocketController.text = (prefs.getInt('rocket') ?? 0).toString();
+      _menuController.text = (prefs.getInt('menu') ?? 0).toString();
+
+      // 文字を入れただけだと合計が変わらないので、再計算する
+      _calculateTotal();
+    });
+  }
+
+  // 【起動時に一度だけ呼ばれる特別な場所】
+  @override
+  void initState() {
+    super.initState();
+    _loadData(); // アプリ起動時にデータを読み込みに行く！
   }
 
   // 【4. 片付ける】
