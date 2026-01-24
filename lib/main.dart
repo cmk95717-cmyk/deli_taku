@@ -41,7 +41,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   // ここに変数を定義します（合計金額など）
 
   int totalEarnings = 0;
-  final int dailyGoal = 15000;
+  int dailyGoal = 15000;
 
   // すでにあるフォーマッター
   final formatter = NumberFormat("#,###");
@@ -88,6 +88,44 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     _saveData();
   }
 
+  // 【目標金額を変更するダイアログを表示】
+  void _showEditGoalDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        // ダイアログの中の入力欄用コントローラー
+        final controller = TextEditingController(text: dailyGoal.toString());
+
+        return AlertDialog(
+          title: const Text('目標金額を設定'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(suffixText: '円'),
+            autofocus: true, // ダイアログが開いたらすぐ入力できるようにする
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context), // キャンセルなら閉じる
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  // 入力された数字を目標金額にセット（空なら15000）
+                  dailyGoal = int.tryParse(controller.text) ?? 15000;
+                });
+                _saveData(); // 新しい目標を保存
+                Navigator.pop(context); // 閉じる
+              },
+              child: const Text('決定'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // 【データを保存する機能】
   // 計算するたびに、この関数を呼んでスマホに数字を書き込みます
   Future<void> _saveData() async {
@@ -98,6 +136,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     await prefs.setInt('wolt', int.tryParse(_woltController.text) ?? 0);
     await prefs.setInt('rocket', int.tryParse(_rocketController.text) ?? 0);
     await prefs.setInt('menu', int.tryParse(_menuController.text) ?? 0);
+    await prefs.setInt('dailyGoal', dailyGoal);
     // 日付も保存しておくと、あとで「日付が変わったらリセット」ができます（今回はまだ数字だけ）
   }
 
@@ -112,6 +151,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       _woltController.text = (prefs.getInt('wolt') ?? 0).toString();
       _rocketController.text = (prefs.getInt('rocket') ?? 0).toString();
       _menuController.text = (prefs.getInt('menu') ?? 0).toString();
+      dailyGoal = prefs.getInt('dailyGoal') ?? 15000;
 
       // 文字を入れただけだと合計が変わらないので、再計算する
       _calculateTotal();
@@ -142,6 +182,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    double progress = 0.0;
+    if (dailyGoal > 0) {
+      progress = totalEarnings / dailyGoal;
+      if (progress > 1.0) progress = 1.0;
+    }
+
     return Scaffold(
       // キーボードが出た時にレイアウトが崩れないようにスクロール可能にする
       body: SingleChildScrollView(
@@ -188,7 +234,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                         height: 150,
 
                         child: CircularProgressIndicator(
-                          value: 0, // 仮の値：70%達成
+                          value: progress, // 仮の値：70%達成
 
                           strokeWidth: 10,
 
@@ -230,10 +276,38 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
                   const SizedBox(height: 20),
 
-                  const Text(
-                    "頑張ったね！",
-
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  // タップできるボタン（InkWell）に変更
+                  InkWell(
+                    onTap: _showEditGoalDialog, // タップしたらダイアログを表示
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2), // 半透明の背景
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white,
+                          width: 1,
+                        ), // 白い枠線
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.edit, color: Colors.white, size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            "目標: ¥${formatter.format(dailyGoal)}",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -290,9 +364,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               padding: const EdgeInsets.only(bottom: 40),
 
               child: TextButton.icon(
-                onPressed: () {
-                  // ここにリセット処理
-                },
+                onPressed: null,
+
+                onLongPress: _resetAll,
 
                 icon: const Icon(Icons.delete_outline, color: Colors.grey),
 
