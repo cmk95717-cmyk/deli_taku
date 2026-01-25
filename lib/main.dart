@@ -146,11 +146,20 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       // 保存された数字を取り出す（もし無ければ 0 を入れる）
-      _uberController.text = (prefs.getInt('uber') ?? 0).toString();
-      _demaeController.text = (prefs.getInt('demae') ?? 0).toString();
-      _woltController.text = (prefs.getInt('wolt') ?? 0).toString();
-      _rocketController.text = (prefs.getInt('rocket') ?? 0).toString();
-      _menuController.text = (prefs.getInt('menu') ?? 0).toString();
+      int uber = prefs.getInt('uber') ?? 0;
+      _uberController.text = uber == 0 ? "" : uber.toString();
+
+      int demae = prefs.getInt('demae') ?? 0;
+      _demaeController.text = demae == 0 ? "" : demae.toString();
+
+      int wolt = prefs.getInt('wolt') ?? 0;
+      _woltController.text = wolt == 0 ? "" : wolt.toString();
+
+      int rocket = prefs.getInt('rocket') ?? 0;
+      _rocketController.text = rocket == 0 ? "" : rocket.toString();
+
+      int menu = prefs.getInt('menu') ?? 0;
+      _menuController.text = menu == 0 ? "" : menu.toString();
       dailyGoal = prefs.getInt('dailyGoal') ?? 15000;
 
       // 文字を入れただけだと合計が変わらないので、再計算する
