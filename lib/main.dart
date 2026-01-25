@@ -210,7 +210,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             Container(
               width: double.infinity,
 
-              padding: const EdgeInsets.only(top: 60, bottom: 40),
+              padding: const EdgeInsets.only(top: 40, bottom: 10),
 
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -238,9 +238,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
                     children: [
                       SizedBox(
-                        width: 150,
+                        width: 140,
 
-                        height: 150,
+                        height: 140,
 
                         child: CircularProgressIndicator(
                           value: progress, // 仮の値：70%達成
@@ -263,7 +263,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                             style: TextStyle(
                               color: Colors.white70,
 
-                              fontSize: 16,
+                              fontSize: 14,
                             ),
                           ),
 
@@ -273,7 +273,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                             style: const TextStyle(
                               color: Colors.white,
 
-                              fontSize: 28,
+                              fontSize: 24,
 
                               fontWeight: FontWeight.bold,
                             ),
@@ -285,38 +285,66 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
                   const SizedBox(height: 20),
 
-                  // タップできるボタン（InkWell）に変更
-                  InkWell(
-                    onTap: _showEditGoalDialog, // タップしたらダイアログを表示
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2), // 半透明の背景
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 1,
-                        ), // 白い枠線
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.edit, color: Colors.white, size: 16),
-                          const SizedBox(width: 8),
-                          Text(
-                            "目標: ¥${formatter.format(dailyGoal)}",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                            ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center, // 中央寄せ
+                    crossAxisAlignment: CrossAxisAlignment.center, // 上下中央揃え
+                    children: [
+                      // 左側：残り金額 or 達成メッセージ
+                      if (totalEarnings < dailyGoal) ...[
+                        Text(
+                          "あと ¥${formatter.format(dailyGoal - totalEarnings)}",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20, // 横並びなので少しだけ小さく調整
+                            fontWeight: FontWeight.bold,
                           ),
-                        ],
+                        ),
+                      ] else ...[
+                        const Text(
+                          "🎉 達成！",
+                          style: TextStyle(
+                            color: Colors.yellowAccent,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(width: 15), // テキストとボタンの間隔
+                      // 右側：目標設定ボタン
+                      InkWell(
+                        onTap: _showEditGoalDialog,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white, width: 1),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.edit,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                "目標¥${formatter.format(dailyGoal)}",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
