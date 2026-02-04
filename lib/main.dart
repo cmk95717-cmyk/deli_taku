@@ -41,6 +41,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   // ここに変数を定義します（合計金額など）
 
   int totalEarnings = 0;
+  int totalCount = 0;
   int dailyGoal = 15000;
 
   // すでにあるフォーマッター
@@ -49,27 +50,45 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   // 【1. 記憶する】
   // 各入力欄の文字を管理する「コントローラー」を作ります。
   // これがないと、TextFieldに入力された文字をプログラム側で読み取れません。
+  //金額用
   final _uberController = TextEditingController();
   final _demaeController = TextEditingController();
   final _woltController = TextEditingController();
   final _rocketController = TextEditingController();
   final _menuController = TextEditingController();
 
+  //件数用
+  final _uberCountController = TextEditingController();
+  final _demaeCountController = TextEditingController();
+  final _woltCountController = TextEditingController();
+  final _rocketCountController = TextEditingController();
+  final _menuCountController = TextEditingController();
+
   // 【2. 計算する】
   // コントローラーから文字を取り出し、数字に変換して足し算します。
   void _calculateTotal() {
     // .text で入力されている文字を取得し、
     // int.tryParse で数字に変換します（空欄や文字なら 0 になるように ?? 0 をつける）
+    //金額の計算
     int uber = int.tryParse(_uberController.text) ?? 0;
     int demae = int.tryParse(_demaeController.text) ?? 0;
     int wolt = int.tryParse(_woltController.text) ?? 0;
     int rocket = int.tryParse(_rocketController.text) ?? 0;
     int menu = int.tryParse(_menuController.text) ?? 0;
 
+    //件数の計算
+    int uberCount = int.tryParse(_uberCountController.text) ?? 0;
+    int demaeCount = int.tryParse(_demaeCountController.text) ?? 0;
+    int woltCount = int.tryParse(_woltCountController.text) ?? 0;
+    int rocketCount = int.tryParse(_rocketCountController.text) ?? 0;
+    int menuCount = int.tryParse(_menuCountController.text) ?? 0;
+
     // setState で「画面を更新して！」とFlutterに伝えます。
     // これを忘れると、計算はされるけど画面の数字が変わりません。
     setState(() {
-      totalEarnings = uber + demae + wolt + rocket + menu;
+      totalEarnings = uber + demae + wolt + rocket + menu; //合計金額
+      totalCount =
+          uberCount + demaeCount + woltCount + rocketCount + menuCount; // ★合計件数
     });
     _saveData();
   }
@@ -78,12 +97,22 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   // 全部空っぽにして、合計も0にします。
   void _resetAll() {
     setState(() {
+      //金額
       _uberController.clear();
       _demaeController.clear();
       _woltController.clear();
       _rocketController.clear();
       _menuController.clear();
+
+      //件数
+      _uberCountController.clear();
+      _demaeCountController.clear();
+      _woltCountController.clear();
+      _rocketCountController.clear();
+      _menuCountController.clear();
+
       totalEarnings = 0;
+      totalCount = 0;
     });
     _saveData();
   }
@@ -136,6 +165,29 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     await prefs.setInt('wolt', int.tryParse(_woltController.text) ?? 0);
     await prefs.setInt('rocket', int.tryParse(_rocketController.text) ?? 0);
     await prefs.setInt('menu', int.tryParse(_menuController.text) ?? 0);
+
+    // 2. ★件数の保存 (ここを追加！)
+    await prefs.setInt(
+      'uberCount',
+      int.tryParse(_uberCountController.text) ?? 0,
+    );
+    await prefs.setInt(
+      'demaeCount',
+      int.tryParse(_demaeCountController.text) ?? 0,
+    );
+    await prefs.setInt(
+      'woltCount',
+      int.tryParse(_woltCountController.text) ?? 0,
+    );
+    await prefs.setInt(
+      'rocketCount',
+      int.tryParse(_rocketCountController.text) ?? 0,
+    );
+    await prefs.setInt(
+      'menuCount',
+      int.tryParse(_menuCountController.text) ?? 0,
+    );
+
     await prefs.setInt('dailyGoal', dailyGoal);
     // 日付も保存しておくと、あとで「日付が変わったらリセット」ができます（今回はまだ数字だけ）
   }
@@ -160,6 +212,24 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
       int menu = prefs.getInt('menu') ?? 0;
       _menuController.text = menu == 0 ? "" : menu.toString();
+
+      int uberCount = prefs.getInt('uberCount') ?? 0;
+      _uberCountController.text = uberCount == 0 ? "" : uberCount.toString();
+
+      int demaeCount = prefs.getInt('demaeCount') ?? 0;
+      _demaeCountController.text = demaeCount == 0 ? "" : demaeCount.toString();
+
+      int woltCount = prefs.getInt('woltCount') ?? 0;
+      _woltCountController.text = woltCount == 0 ? "" : woltCount.toString();
+
+      int rocketCount = prefs.getInt('rocketCount') ?? 0;
+      _rocketCountController.text = rocketCount == 0
+          ? ""
+          : rocketCount.toString();
+
+      int menuCount = prefs.getInt('menuCount') ?? 0;
+      _menuCountController.text = menuCount == 0 ? "" : menuCount.toString();
+
       dailyGoal = prefs.getInt('dailyGoal') ?? 15000;
 
       // 文字を入れただけだと合計が変わらないので、再計算する
@@ -263,7 +333,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                             style: TextStyle(
                               color: Colors.white70,
 
-                              fontSize: 14,
+                              fontSize: 12,
                             ),
                           ),
 
@@ -275,6 +345,14 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
                               fontSize: 24,
 
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            "件数: $totalCount回",
+                            style: const TextStyle(
+                              color: Colors.white, // 少し薄く
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -366,28 +444,40 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     "🐸",
                     Colors.green,
                     _uberController,
+                    _uberCountController,
                   ),
-
                   const SizedBox(height: 15),
-
-                  _buildInputCard("出前館", "🥫", Colors.red, _demaeController),
-
+                  _buildInputCard(
+                    "出前館",
+                    "🥫",
+                    Colors.red,
+                    _demaeController,
+                    _demaeCountController,
+                  ),
                   const SizedBox(height: 15),
-
-                  _buildInputCard("Wolt", "🦌", Colors.blue, _woltController),
-
+                  _buildInputCard(
+                    "Wolt",
+                    "🦌",
+                    Colors.blue,
+                    _woltController,
+                    _woltCountController,
+                  ),
                   const SizedBox(height: 15),
-
                   _buildInputCard(
                     "Rocket Now",
                     "🚀",
                     Colors.orange,
                     _rocketController,
+                    _rocketCountController,
                   ),
-
                   const SizedBox(height: 15),
-
-                  _buildInputCard("Menu", "📚", Colors.green, _menuController),
+                  _buildInputCard(
+                    "その他",
+                    "📚",
+                    Colors.green,
+                    _menuController,
+                    _menuCountController,
+                  ),
                 ],
               ),
             ),
@@ -426,80 +516,95 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     String title,
     String emoji,
     Color accentColor,
-    TextEditingController controller,
+    TextEditingController moneyController, // 金額用
+    TextEditingController countController, // ★件数用
   ) {
     return Card(
       elevation: 4, // 影の強さ
-
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-
       color: Colors.white,
-
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-
         child: Row(
           children: [
             // 左側のアイコン
             Container(
-              width: 50,
-
-              height: 50,
-
+              width: 45,
+              height: 45,
               alignment: Alignment.center,
-
               decoration: BoxDecoration(
                 color: accentColor.withOpacity(0.1),
-
                 borderRadius: BorderRadius.circular(12),
               ),
-
-              child: Text(emoji, style: const TextStyle(fontSize: 24)),
+              child: Text(emoji, style: const TextStyle(fontSize: 22)),
             ),
-
             const SizedBox(width: 15),
-
             // サービス名
             Expanded(
               child: Text(
                 title,
-
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
-
-                  fontSize: 16,
+                  fontSize: 14,
                 ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            SizedBox(
+              width: 60, // 幅を固定
+              child: TextField(
+                controller: countController,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: "0",
+                  suffixText: "件",
+                  suffixStyle: const TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                  ), // 高さを調整
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.red.withOpacity(0.05), // 薄い赤背景で強調
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onChanged: (value) => _calculateTotal(),
               ),
             ),
 
+            const SizedBox(width: 10),
+
             // 入力欄
             SizedBox(
-              width: 100,
-
+              width: 90,
               child: TextField(
-                controller: controller,
+                controller: moneyController,
                 keyboardType: TextInputType.number,
-
                 textAlign: TextAlign.right,
-
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
                 decoration: InputDecoration(
                   hintText: "0",
-
                   suffixText: "円",
-
+                  suffixStyle: const TextStyle(fontSize: 12),
                   filled: true,
-
                   fillColor: Colors.grey[100],
-
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-
                     borderSide: BorderSide.none,
                   ),
 
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 10,
-
                     vertical: 8,
                   ),
                 ),
