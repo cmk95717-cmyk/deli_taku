@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
-
 import 'package:intl/intl.dart';
-
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async'; // 非同期処理用
+import 'dart:convert'; // データ変換用
+import 'dart:typed_data'; // バイナリデータ用
+import 'dart:ui' as ui; // 画像処理用
+import 'package:flutter/rendering.dart'; // レンダリング用
+// ↓ Webでファイルを保存するための特殊なインポート
+import 'package:share_plus/share_plus.dart';
 
 void main() {
   runApp(const MyApp());
@@ -39,6 +44,7 @@ class CalculatorScreen extends StatefulWidget {
 
 class _CalculatorScreenState extends State<CalculatorScreen> {
   // ここに変数を定義します（合計金額など）
+  final GlobalKey _imageKey = GlobalKey();
 
   int totalEarnings = 0;
   int totalCount = 0;
@@ -115,6 +121,50 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       totalCount = 0;
     });
     _saveData();
+  }
+
+  Future<void> _captureAndSaveImage() async {
+    try {
+      // 1. 鍵を使って、裏にあるスタジオを見つける
+      RenderRepaintBoundary boundary =
+          _imageKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+
+      // 2. 撮影する（高解像度で！）
+      if (boundary.debugNeedsPaint) {
+        // まだ描画準備ができていない場合の待機処理
+        await Future.delayed(const Duration(milliseconds: 20));
+      }
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+
+      // 3. 画像をPNGデータに変換
+      ByteData? byteData = await image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+      Uint8List pngBytes = byteData!.buffer.asUint8List();
+
+      // 4. ファイル名を作る
+      final now = DateTime.now();
+      final fileName =
+          "delitaku_${DateFormat('yyyyMMdd_HHmm').format(now)}.png";
+
+      // 5. ★ここが進化！スマホの「共有メニュー」を開く
+      // XFileという形式に包んでシェアします
+      final xFile = XFile.fromData(
+        pngBytes,
+        mimeType: 'image/png',
+        name: fileName,
+      );
+
+      await Share.shareXFiles(
+        [xFile],
+        text: '本日の稼働実績🐸 #DeliTaku', // ここに好きなハッシュタグなどを入れられます
+      );
+    } catch (e) {
+      print(e);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('画像の生成に失敗しました💦')));
+    }
   }
 
   // 【目標金額を変更するダイアログを表示】
@@ -268,244 +318,268 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     }
 
     return Scaffold(
-      // キーボードが出た時にレイアウトが崩れないようにスクロール可能にする
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // -------------------------
-
-            // 1. ヘッダー部分 (グラデーション & 円形グラフ)
-
-            // -------------------------
-            Container(
-              width: double.infinity,
-
-              padding: const EdgeInsets.only(top: 40, bottom: 10),
-
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.teal, Colors.blueAccent], // 青緑〜青のグラデーション
-
-                  begin: Alignment.topLeft,
-
-                  end: Alignment.bottomRight,
-                ),
-
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(30),
-
-                  bottomRight: Radius.circular(30),
-                ),
+      // Stackで「撮影スタジオ」と「メイン画面」を重ねる
+      body: Stack(
+        children: [
+          // ---------------------------------------------
+          // 1. 裏側：撮影用スタジオ (画面の外に配置！)
+          // ---------------------------------------------
+          Transform.translate(
+            // X軸に大きくずらして、画面の右側（見えない場所）に配置する
+            offset: const Offset(9999, 0),
+            child: RepaintBoundary(
+              key: _imageKey, // カメラの鍵
+              child: SummaryImageWidget(
+                totalEarnings: totalEarnings,
+                totalCount: totalCount,
+                dailyGoal: dailyGoal,
+                uber: int.tryParse(_uberController.text) ?? 0,
+                demae: int.tryParse(_demaeController.text) ?? 0,
+                wolt: int.tryParse(_woltController.text) ?? 0,
+                rocket: int.tryParse(_rocketController.text) ?? 0,
+                menu: int.tryParse(_menuController.text) ?? 0,
               ),
+            ),
+          ),
 
+          // ---------------------------------------------
+          // 2. 表側：いつもの操作画面 (メイン)
+          // ---------------------------------------------
+          Container(
+            color: const Color(0xFFF5F5F5), // 背景色をしっかり指定（透け防止）
+            height: double.infinity,
+            child: SingleChildScrollView(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-
                 children: [
-                  // 円形プログレスバーと金額の重ね合わせ
-                  Stack(
-                    alignment: Alignment.center,
-
-                    children: [
-                      SizedBox(
-                        width: 140,
-
-                        height: 140,
-
-                        child: CircularProgressIndicator(
-                          value: progress, // 仮の値：70%達成
-
-                          strokeWidth: 10,
-
-                          backgroundColor: Colors.white.withOpacity(0.3),
-
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            Colors.white,
-                          ),
-                        ),
+                  // 1. ヘッダー部分
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.only(top: 80, bottom: 20),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.teal, Colors.blueAccent],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-
-                      Column(
-                        children: [
-                          const Text(
-                            "Total",
-
-                            style: TextStyle(
-                              color: Colors.white70,
-
-                              fontSize: 12,
-                            ),
-                          ),
-
-                          Text(
-                            "¥${formatter.format(totalEarnings)}",
-
-                            style: const TextStyle(
-                              color: Colors.white,
-
-                              fontSize: 24,
-
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            "件数: $totalCount回",
-                            style: const TextStyle(
-                              color: Colors.white, // 少し薄く
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(30),
+                        bottomRight: Radius.circular(30),
                       ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center, // 中央寄せ
-                    crossAxisAlignment: CrossAxisAlignment.center, // 上下中央揃え
-                    children: [
-                      // 左側：残り金額 or 達成メッセージ
-                      if (totalEarnings < dailyGoal) ...[
-                        Text(
-                          "あと ¥${formatter.format(dailyGoal - totalEarnings)}",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20, // 横並びなので少しだけ小さく調整
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ] else ...[
-                        const Text(
-                          "🎉 達成！",
-                          style: TextStyle(
-                            color: Colors.yellowAccent,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-
-                      const SizedBox(width: 15), // テキストとボタンの間隔
-                      // 右側：目標設定ボタン
-                      InkWell(
-                        onTap: _showEditGoalDialog,
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.white, width: 1),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.edit,
-                                color: Colors.white,
-                                size: 14,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // 円形プログレスバー
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            SizedBox(
+                              width: 140,
+                              height: 140,
+                              child: CircularProgressIndicator(
+                                value: progress,
+                                strokeWidth: 10,
+                                backgroundColor: Colors.white.withOpacity(0.3),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
-                              const SizedBox(width: 4),
+                            ),
+                            Column(
+                              children: [
+                                const Text(
+                                  "Total",
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Text(
+                                  "¥${formatter.format(totalEarnings)}",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  "件数: $totalCount回",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // ボタンエリア
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // 残り金額 or 達成メッセージ
+                            if (totalEarnings < dailyGoal) ...[
                               Text(
-                                "目標¥${formatter.format(dailyGoal)}",
+                                "あと ¥${formatter.format(dailyGoal - totalEarnings)}",
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 14,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ] else ...[
+                              const Text(
+                                "🎉 達成！",
+                                style: TextStyle(
+                                  color: Colors.yellowAccent,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ],
-                          ),
+
+                            const SizedBox(width: 15),
+
+                            // 目標設定ボタン
+                            InkWell(
+                              onTap: _showEditGoalDialog,
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.edit,
+                                      color: Colors.white,
+                                      size: 14,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      "目標¥${formatter.format(dailyGoal)}",
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(width: 10),
+
+                            // 📸 カメラボタン
+                            InkWell(
+                              onTap: _captureAndSaveImage,
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
+                      ],
+                    ),
+                  ),
+
+                  // 2. 入力リスト部分
+                  Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      children: [
+                        _buildInputCard(
+                          "Uber Eats",
+                          "🐸",
+                          Colors.green,
+                          _uberController,
+                          _uberCountController,
+                        ),
+                        const SizedBox(height: 15),
+                        _buildInputCard(
+                          "出前館",
+                          "🥫",
+                          Colors.red,
+                          _demaeController,
+                          _demaeCountController,
+                        ),
+                        const SizedBox(height: 15),
+                        _buildInputCard(
+                          "Wolt",
+                          "🦌",
+                          Colors.blue,
+                          _woltController,
+                          _woltCountController,
+                        ),
+                        const SizedBox(height: 15),
+                        _buildInputCard(
+                          "Rocket Now",
+                          "🚀",
+                          Colors.orange,
+                          _rocketController,
+                          _rocketCountController,
+                        ),
+                        const SizedBox(height: 15),
+                        _buildInputCard(
+                          "その他",
+                          "📚",
+                          Colors.green,
+                          _menuController,
+                          _menuCountController,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 3. リセットボタン
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 40),
+                    child: TextButton.icon(
+                      onPressed: null,
+                      onLongPress: _resetAll,
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.grey,
                       ),
-                    ],
+                      label: const Text(
+                        "リセット (長押し)",
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-
-            // -------------------------
-
-            // 2. 入力リスト部分
-
-            // -------------------------
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-
-              child: Column(
-                children: [
-                  // ここに各社のカードを並べます
-                  _buildInputCard(
-                    "Uber Eats",
-                    "🐸",
-                    Colors.green,
-                    _uberController,
-                    _uberCountController,
-                  ),
-                  const SizedBox(height: 15),
-                  _buildInputCard(
-                    "出前館",
-                    "🥫",
-                    Colors.red,
-                    _demaeController,
-                    _demaeCountController,
-                  ),
-                  const SizedBox(height: 15),
-                  _buildInputCard(
-                    "Wolt",
-                    "🦌",
-                    Colors.blue,
-                    _woltController,
-                    _woltCountController,
-                  ),
-                  const SizedBox(height: 15),
-                  _buildInputCard(
-                    "Rocket Now",
-                    "🚀",
-                    Colors.orange,
-                    _rocketController,
-                    _rocketCountController,
-                  ),
-                  const SizedBox(height: 15),
-                  _buildInputCard(
-                    "その他",
-                    "📚",
-                    Colors.green,
-                    _menuController,
-                    _menuCountController,
-                  ),
-                ],
-              ),
-            ),
-
-            // -------------------------
-
-            // 3. リセットボタン
-
-            // -------------------------
-            Padding(
-              padding: const EdgeInsets.only(bottom: 40),
-
-              child: TextButton.icon(
-                onPressed: null,
-
-                onLongPress: _resetAll,
-
-                icon: const Icon(Icons.delete_outline, color: Colors.grey),
-
-                label: const Text(
-                  "リセット (長押し)",
-
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -615,6 +689,185 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------
+// X投稿用画像のデザイン（撮影用スタジオ）
+// ---------------------------------------------------------
+class SummaryImageWidget extends StatelessWidget {
+  final int totalEarnings;
+  final int totalCount;
+  final int dailyGoal;
+  // 各社の売上
+  final int uber, demae, wolt, rocket, menu;
+
+  const SummaryImageWidget({
+    super.key,
+    required this.totalEarnings,
+    required this.totalCount,
+    required this.dailyGoal,
+    required this.uber,
+    required this.demae,
+    required this.wolt,
+    required this.rocket,
+    required this.menu,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final formatter = NumberFormat("#,###");
+    double progress = 0.0;
+    if (dailyGoal > 0) {
+      progress = totalEarnings / dailyGoal;
+      if (progress > 1.0) progress = 1.0;
+    }
+
+    return MediaQuery(
+      data: const MediaQueryData(
+        textScaler: TextScaler.linear(1.0), // どんな端末でも文字サイズを標準に固定！
+      ),
+      child: Container(
+        width: 600,
+        height: 314,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.teal, Colors.blueAccent],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Stack(
+          children: [
+            // ------------------------------------
+            // 1. メインのコンテンツ（円グラフとリスト）
+            // ------------------------------------
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // --- 左側：円形プログレスバー ---
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox(
+                      width: 150,
+                      height: 150,
+                      child: CircularProgressIndicator(
+                        value: progress,
+                        strokeWidth: 10,
+                        backgroundColor: Colors.white.withOpacity(0.3),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Colors.white,
+                        ),
+                      ),
+                    ),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          "Total",
+                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                        Text(
+                          "¥${formatter.format(totalEarnings)}",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          "件数: $totalCount回",
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                // --- 右側：リスト部分 ---
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSummaryRow("Uber Eats", uber, formatter),
+                    _buildSummaryRow("出前館", demae, formatter),
+                    _buildSummaryRow("Wolt", wolt, formatter),
+                    _buildSummaryRow("Rocket Now", rocket, formatter),
+                    _buildSummaryRow("その他", menu, formatter),
+                    // ※ここにあったロゴは削除して外に出しました
+                  ],
+                ),
+              ],
+            ),
+
+            // ------------------------------------
+            // 2. ロゴ（右下に絶対配置！）
+            // ------------------------------------
+            Positioned(
+              right: 15, // 右端から15px
+              bottom: 15, // 下端から15px
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  "Generated by DeliTaku",
+                  style: TextStyle(color: Colors.white70, fontSize: 10),
+                ),
+              ),
+            ),
+
+            Positioned(
+              left: 40, // 左から20px
+              top: 30, // 上から20px
+              child: Text(
+                "目標 : ¥${formatter.format(dailyGoal)}",
+                style: const TextStyle(
+                  color: Colors.white70, // 背景に合わせて白文字
+                  fontSize: 18, // 少し大きめに強調
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow(String title, int amount, NumberFormat formatter) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              title,
+              style: const TextStyle(color: Colors.white, fontSize: 20),
+            ),
+          ),
+          Text(
+            "¥${formatter.format(amount)}",
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }
