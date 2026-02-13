@@ -269,9 +269,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       }
     } catch (e) {
       print(e);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('画像の生成に失敗しました💦')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('アプリ版で実装予定です。もう少々お待ちください💦')),
+      );
     }
   }
 
