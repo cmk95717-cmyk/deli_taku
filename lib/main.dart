@@ -1,18 +1,24 @@
+import 'package:flutter/foundation.dart'; // Web判定用 (kIsWeb)
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart'; // 画像生成用
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
+// 外部パッケージ
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:async'; // 非同期処理用
-import 'dart:convert'; // データ変換用
-import 'dart:typed_data'; // バイナリデータ用
-import 'dart:ui' as ui; // 画像処理用
-import 'package:flutter/rendering.dart'; // レンダリング用
-// ↓ Webでファイルを保存するための特殊なインポート
 import 'package:share_plus/share_plus.dart';
+import 'package:universal_html/html.dart' as html;
 
 void main() {
   runApp(const MyApp());
 }
 
+// =========================================================
+// アプリ全体の定義
+// =========================================================
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -20,21 +26,19 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'DeliCalc',
-
       theme: ThemeData(
-        // 全体の色味を調整
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-
         useMaterial3: true,
-
-        scaffoldBackgroundColor: const Color(0xFFF5F5F5), // 薄いグレーの背景
+        scaffoldBackgroundColor: const Color(0xFFF5F5F5),
       ),
-
       home: const CalculatorScreen(),
     );
   }
 }
 
+// =========================================================
+// 計算画面 (メイン機能)
+// =========================================================
 class CalculatorScreen extends StatefulWidget {
   const CalculatorScreen({super.key});
 
@@ -43,180 +47,116 @@ class CalculatorScreen extends StatefulWidget {
 }
 
 class _CalculatorScreenState extends State<CalculatorScreen> {
-  // ここに変数を定義します（合計金額など）
-  final GlobalKey _imageKey = GlobalKey();
+  // ---------------------------------------------------
+  // 1. 変数・コントローラー定義
+  // ---------------------------------------------------
+  final GlobalKey _imageKey = GlobalKey(); // 画像化するウィジェットのキー
+  final formatter = NumberFormat("#,###"); // 数字のフォーマット
 
+  // データ変数
   int totalEarnings = 0;
   int totalCount = 0;
   int dailyGoal = 15000;
 
-  // すでにあるフォーマッター
-  final formatter = NumberFormat("#,###");
-
-  // 【1. 記憶する】
-  // 各入力欄の文字を管理する「コントローラー」を作ります。
-  // これがないと、TextFieldに入力された文字をプログラム側で読み取れません。
-  //金額用
+  // 入力コントローラー (金額)
   final _uberController = TextEditingController();
   final _demaeController = TextEditingController();
   final _woltController = TextEditingController();
   final _rocketController = TextEditingController();
   final _menuController = TextEditingController();
 
-  //件数用
+  // 入力コントローラー (件数)
   final _uberCountController = TextEditingController();
   final _demaeCountController = TextEditingController();
   final _woltCountController = TextEditingController();
   final _rocketCountController = TextEditingController();
   final _menuCountController = TextEditingController();
 
-  // 【2. 計算する】
-  // コントローラーから文字を取り出し、数字に変換して足し算します。
+  // ---------------------------------------------------
+  // 2. ライフサイクル (起動・終了時の処理)
+  // ---------------------------------------------------
+  @override
+  void initState() {
+    super.initState();
+    _loadData(); // 起動時にデータを読み込む
+  }
+
+  @override
+  void dispose() {
+    // 画面終了時にメモリを開放
+    _uberController.dispose();
+    _demaeController.dispose();
+    _woltController.dispose();
+    _rocketController.dispose();
+    _menuController.dispose();
+    _uberCountController.dispose();
+    _demaeCountController.dispose();
+    _woltCountController.dispose();
+    _rocketCountController.dispose();
+    _menuCountController.dispose();
+    super.dispose();
+  }
+
+  // ---------------------------------------------------
+  // 3. ロジック (計算・保存・読み込み)
+  // ---------------------------------------------------
+
+  // 合計を計算する
   void _calculateTotal() {
-    // .text で入力されている文字を取得し、
-    // int.tryParse で数字に変換します（空欄や文字なら 0 になるように ?? 0 をつける）
-    //金額の計算
+    // 金額取得
     int uber = int.tryParse(_uberController.text) ?? 0;
     int demae = int.tryParse(_demaeController.text) ?? 0;
     int wolt = int.tryParse(_woltController.text) ?? 0;
     int rocket = int.tryParse(_rocketController.text) ?? 0;
     int menu = int.tryParse(_menuController.text) ?? 0;
 
-    //件数の計算
+    // 件数取得
     int uberCount = int.tryParse(_uberCountController.text) ?? 0;
     int demaeCount = int.tryParse(_demaeCountController.text) ?? 0;
     int woltCount = int.tryParse(_woltCountController.text) ?? 0;
     int rocketCount = int.tryParse(_rocketCountController.text) ?? 0;
     int menuCount = int.tryParse(_menuCountController.text) ?? 0;
 
-    // setState で「画面を更新して！」とFlutterに伝えます。
-    // これを忘れると、計算はされるけど画面の数字が変わりません。
     setState(() {
-      totalEarnings = uber + demae + wolt + rocket + menu; //合計金額
-      totalCount =
-          uberCount + demaeCount + woltCount + rocketCount + menuCount; // ★合計件数
+      totalEarnings = uber + demae + wolt + rocket + menu;
+      totalCount = uberCount + demaeCount + woltCount + rocketCount + menuCount;
     });
     _saveData();
   }
 
-  // 【3. リセットする】
-  // 全部空っぽにして、合計も0にします。
+  // データをリセット
   void _resetAll() {
     setState(() {
-      //金額
+      // コントローラーをクリア
       _uberController.clear();
       _demaeController.clear();
       _woltController.clear();
       _rocketController.clear();
       _menuController.clear();
 
-      //件数
       _uberCountController.clear();
       _demaeCountController.clear();
       _woltCountController.clear();
       _rocketCountController.clear();
       _menuCountController.clear();
 
+      // 合計を0に
       totalEarnings = 0;
       totalCount = 0;
     });
     _saveData();
   }
 
-  Future<void> _captureAndSaveImage() async {
-    try {
-      // 1. 鍵を使って、裏にあるスタジオを見つける
-      RenderRepaintBoundary boundary =
-          _imageKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-
-      // 2. 撮影する（高解像度で！）
-      if (boundary.debugNeedsPaint) {
-        // まだ描画準備ができていない場合の待機処理
-        await Future.delayed(const Duration(milliseconds: 20));
-      }
-      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-
-      // 3. 画像をPNGデータに変換
-      ByteData? byteData = await image.toByteData(
-        format: ui.ImageByteFormat.png,
-      );
-      Uint8List pngBytes = byteData!.buffer.asUint8List();
-
-      // 4. ファイル名を作る
-      final now = DateTime.now();
-      final fileName =
-          "delitaku_${DateFormat('yyyyMMdd_HHmm').format(now)}.png";
-
-      // 5. ★ここが進化！スマホの「共有メニュー」を開く
-      // XFileという形式に包んでシェアします
-      final xFile = XFile.fromData(
-        pngBytes,
-        mimeType: 'image/png',
-        name: fileName,
-      );
-
-      await Share.shareXFiles(
-        [xFile],
-        text: '本日の稼働実績🐸 #DeliTaku', // ここに好きなハッシュタグなどを入れられます
-      );
-    } catch (e) {
-      print(e);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('画像の生成に失敗しました💦')));
-    }
-  }
-
-  // 【目標金額を変更するダイアログを表示】
-  void _showEditGoalDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        // ダイアログの中の入力欄用コントローラー
-        final controller = TextEditingController(text: dailyGoal.toString());
-
-        return AlertDialog(
-          title: const Text('目標金額を設定'),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(suffixText: '円'),
-            autofocus: true, // ダイアログが開いたらすぐ入力できるようにする
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context), // キャンセルなら閉じる
-              child: const Text('キャンセル'),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  // 入力された数字を目標金額にセット（空なら15000）
-                  dailyGoal = int.tryParse(controller.text) ?? 15000;
-                });
-                _saveData(); // 新しい目標を保存
-                Navigator.pop(context); // 閉じる
-              },
-              child: const Text('決定'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // 【データを保存する機能】
-  // 計算するたびに、この関数を呼んでスマホに数字を書き込みます
+  // データを保存 (SharedPreferences)
   Future<void> _saveData() async {
     final prefs = await SharedPreferences.getInstance();
-    // キーワード（'uber'など）を決めて、それぞれの数字を保存
+    // 金額
     await prefs.setInt('uber', int.tryParse(_uberController.text) ?? 0);
     await prefs.setInt('demae', int.tryParse(_demaeController.text) ?? 0);
     await prefs.setInt('wolt', int.tryParse(_woltController.text) ?? 0);
     await prefs.setInt('rocket', int.tryParse(_rocketController.text) ?? 0);
     await prefs.setInt('menu', int.tryParse(_menuController.text) ?? 0);
-
-    // 2. ★件数の保存 (ここを追加！)
+    // 件数
     await prefs.setInt(
       'uberCount',
       int.tryParse(_uberCountController.text) ?? 0,
@@ -237,78 +177,142 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       'menuCount',
       int.tryParse(_menuCountController.text) ?? 0,
     );
-
+    // 目標
     await prefs.setInt('dailyGoal', dailyGoal);
-    // 日付も保存しておくと、あとで「日付が変わったらリセット」ができます（今回はまだ数字だけ）
   }
 
-  // 【データを読み込む機能】
-  // アプリが起動した瞬間に、保存されていた数字を取り出して画面に戻します
+  // データを読み込み
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      // 保存された数字を取り出す（もし無ければ 0 を入れる）
+      // 金額読み込み
       int uber = prefs.getInt('uber') ?? 0;
       _uberController.text = uber == 0 ? "" : uber.toString();
-
       int demae = prefs.getInt('demae') ?? 0;
       _demaeController.text = demae == 0 ? "" : demae.toString();
-
       int wolt = prefs.getInt('wolt') ?? 0;
       _woltController.text = wolt == 0 ? "" : wolt.toString();
-
       int rocket = prefs.getInt('rocket') ?? 0;
       _rocketController.text = rocket == 0 ? "" : rocket.toString();
-
       int menu = prefs.getInt('menu') ?? 0;
       _menuController.text = menu == 0 ? "" : menu.toString();
 
+      // 件数読み込み
       int uberCount = prefs.getInt('uberCount') ?? 0;
       _uberCountController.text = uberCount == 0 ? "" : uberCount.toString();
-
       int demaeCount = prefs.getInt('demaeCount') ?? 0;
       _demaeCountController.text = demaeCount == 0 ? "" : demaeCount.toString();
-
       int woltCount = prefs.getInt('woltCount') ?? 0;
       _woltCountController.text = woltCount == 0 ? "" : woltCount.toString();
-
       int rocketCount = prefs.getInt('rocketCount') ?? 0;
       _rocketCountController.text = rocketCount == 0
           ? ""
           : rocketCount.toString();
-
       int menuCount = prefs.getInt('menuCount') ?? 0;
       _menuCountController.text = menuCount == 0 ? "" : menuCount.toString();
 
+      // 目標読み込み
       dailyGoal = prefs.getInt('dailyGoal') ?? 15000;
 
-      // 文字を入れただけだと合計が変わらないので、再計算する
+      // 再計算
       _calculateTotal();
     });
   }
 
-  // 【起動時に一度だけ呼ばれる特別な場所】
-  @override
-  void initState() {
-    super.initState();
-    _loadData(); // アプリ起動時にデータを読み込みに行く！
+  // ---------------------------------------------------
+  // 4. アクション (画像生成・ダイアログ)
+  // ---------------------------------------------------
+
+  // 画像を生成してシェア/ダウンロード
+  Future<void> _captureAndSaveImage() async {
+    try {
+      RenderRepaintBoundary boundary =
+          _imageKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+
+      // 描画待ち
+      if (boundary.debugNeedsPaint) {
+        await Future.delayed(const Duration(milliseconds: 20));
+      }
+
+      // 撮影
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      ByteData? byteData = await image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+      Uint8List pngBytes = byteData!.buffer.asUint8List();
+
+      final now = DateTime.now();
+      final fileName =
+          "delitaku_${DateFormat('yyyyMMdd_HHmm').format(now)}.png";
+
+      // ★Webとアプリで分岐
+      if (kIsWeb) {
+        // Web: ダウンロード
+        final blob = html.Blob([pngBytes]);
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute("download", fileName)
+          ..click();
+        html.Url.revokeObjectUrl(url);
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('画像をダウンロードしました！')));
+      } else {
+        // アプリ: シェア
+        final xFile = XFile.fromData(
+          pngBytes,
+          mimeType: 'image/png',
+          name: fileName,
+        );
+        await Share.shareXFiles([xFile], text: '本日の稼働実績🐸 #DeliTaku');
+      }
+    } catch (e) {
+      print(e);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('画像の生成に失敗しました💦')));
+    }
   }
 
-  // 【4. 片付ける】
-  // アプリの画面が破棄されるとき（メモリ節約のため）にコントローラーも捨てます。
-  // これはお作法として必ず書くようにしましょう。
-  @override
-  void dispose() {
-    _uberController.dispose();
-    _demaeController.dispose();
-    _woltController.dispose();
-    _rocketController.dispose();
-    _menuController.dispose();
-    super.dispose();
+  // 目標設定ダイアログ
+  void _showEditGoalDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final controller = TextEditingController(text: dailyGoal.toString());
+        return AlertDialog(
+          title: const Text('目標金額を設定'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(suffixText: '円'),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  dailyGoal = int.tryParse(controller.text) ?? 15000;
+                });
+                _saveData();
+                Navigator.pop(context);
+              },
+              child: const Text('決定'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
-  // 金額表示用のフォーマッター (例: 1,200)
-
+  // ---------------------------------------------------
+  // 5. 画面UI構築 (build)
+  // ---------------------------------------------------
   @override
   Widget build(BuildContext context) {
     double progress = 0.0;
@@ -318,40 +322,36 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     }
 
     return Scaffold(
-      // Stackで「撮影スタジオ」と「メイン画面」を重ねる
       body: Stack(
         children: [
-          // ---------------------------------------------
-          // 1. 裏側：撮影用スタジオ (画面の外に配置！)
-          // ---------------------------------------------
-          Transform.translate(
-            // X軸に大きくずらして、画面の右側（見えない場所）に配置する
-            offset: const Offset(9999, 0),
-            child: RepaintBoundary(
-              key: _imageKey, // カメラの鍵
-              child: SummaryImageWidget(
-                totalEarnings: totalEarnings,
-                totalCount: totalCount,
-                dailyGoal: dailyGoal,
-                uber: int.tryParse(_uberController.text) ?? 0,
-                demae: int.tryParse(_demaeController.text) ?? 0,
-                wolt: int.tryParse(_woltController.text) ?? 0,
-                rocket: int.tryParse(_rocketController.text) ?? 0,
-                menu: int.tryParse(_menuController.text) ?? 0,
-              ),
+          // ------------------------------------
+          // 1. 裏側: 撮影用スタジオ (一番下に配置)
+          // ------------------------------------
+          RepaintBoundary(
+            key: _imageKey,
+            child: SummaryImageWidget(
+              totalEarnings: totalEarnings,
+              totalCount: totalCount,
+              dailyGoal: dailyGoal,
+              uber: int.tryParse(_uberController.text) ?? 0,
+              demae: int.tryParse(_demaeController.text) ?? 0,
+              wolt: int.tryParse(_woltController.text) ?? 0,
+              rocket: int.tryParse(_rocketController.text) ?? 0,
+              menu: int.tryParse(_menuController.text) ?? 0,
             ),
           ),
 
-          // ---------------------------------------------
-          // 2. 表側：いつもの操作画面 (メイン)
-          // ---------------------------------------------
+          // ------------------------------------
+          // 2. 表側: メイン操作画面 (背景色で蓋をする)
+          // ------------------------------------
           Container(
-            color: const Color(0xFFF5F5F5), // 背景色をしっかり指定（透け防止）
+            color: const Color(0xFFF5F5F5), // 透け防止
+            width: double.infinity,
             height: double.infinity,
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // 1. ヘッダー部分
+                  // --- ヘッダー (プログレスバー) ---
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.only(top: 80, bottom: 20),
@@ -367,9 +367,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                       ),
                     ),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // 円形プログレスバー
                         Stack(
                           alignment: Alignment.center,
                           children: [
@@ -414,15 +412,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                             ),
                           ],
                         ),
-
                         const SizedBox(height: 20),
-
-                        // ボタンエリア
+                        // ボタン列
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            // 残り金額 or 達成メッセージ
                             if (totalEarnings < dailyGoal) ...[
                               Text(
                                 "あと ¥${formatter.format(dailyGoal - totalEarnings)}",
@@ -442,49 +436,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                                 ),
                               ),
                             ],
-
                             const SizedBox(width: 15),
-
-                            // 目標設定ボタン
-                            InkWell(
-                              onTap: _showEditGoalDialog,
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.edit,
-                                      color: Colors.white,
-                                      size: 14,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      "目標¥${formatter.format(dailyGoal)}",
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                            // 目標編集ボタン
+                            _buildHeaderButton(
+                              Icons.edit,
+                              "目標¥${formatter.format(dailyGoal)}",
+                              _showEditGoalDialog,
                             ),
-
                             const SizedBox(width: 10),
-
-                            // 📸 カメラボタン
+                            // カメラボタン
                             InkWell(
                               onTap: _captureAndSaveImage,
                               borderRadius: BorderRadius.circular(20),
@@ -511,7 +471,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     ),
                   ),
 
-                  // 2. 入力リスト部分
+                  // --- 入力リスト ---
                   Padding(
                     padding: const EdgeInsets.all(20.0),
                     child: Column(
@@ -559,7 +519,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     ),
                   ),
 
-                  // 3. リセットボタン
+                  // --- リセットボタン ---
                   Padding(
                     padding: const EdgeInsets.only(bottom: 40),
                     child: TextButton.icon(
@@ -584,24 +544,48 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     );
   }
 
-  // カードを生成するウィジェット（コードを見やすくするため切り出し）
+  // ヘッダー内のボタン用ウィジェット
+  Widget _buildHeaderButton(IconData icon, String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white, width: 1),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 14),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
+  // 入力カード用ウィジェット
   Widget _buildInputCard(
     String title,
     String emoji,
     Color accentColor,
-    TextEditingController moneyController, // 金額用
-    TextEditingController countController, // ★件数用
+    TextEditingController moneyController,
+    TextEditingController countController,
   ) {
     return Card(
-      elevation: 4, // 影の強さ
+      elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         child: Row(
           children: [
-            // 左側のアイコン
             Container(
               width: 45,
               height: 45,
@@ -613,7 +597,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               child: Text(emoji, style: const TextStyle(fontSize: 22)),
             ),
             const SizedBox(width: 15),
-            // サービス名
             Expanded(
               child: Text(
                 title,
@@ -624,8 +607,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            // 件数入力
             SizedBox(
-              width: 60, // 幅を固定
+              width: 60,
               child: TextField(
                 controller: countController,
                 keyboardType: TextInputType.number,
@@ -638,12 +622,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     fontSize: 10,
                     color: Colors.grey,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    vertical: 8,
-                  ), // 高さを調整
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
                   isDense: true,
                   filled: true,
-                  fillColor: Colors.red.withOpacity(0.05), // 薄い赤背景で強調
+                  fillColor: Colors.red.withOpacity(0.05),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide.none,
@@ -652,10 +634,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 onChanged: (value) => _calculateTotal(),
               ),
             ),
-
             const SizedBox(width: 10),
-
-            // 入力欄
+            // 金額入力
             SizedBox(
               width: 90,
               child: TextField(
@@ -676,15 +656,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
                   ),
-
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 10,
                     vertical: 8,
                   ),
                 ),
-
                 onChanged: (value) => _calculateTotal(),
-                // ここで計算ロジックを呼び出す
               ),
             ),
           ],
@@ -694,14 +671,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   }
 }
 
-// ---------------------------------------------------------
-// X投稿用画像のデザイン（撮影用スタジオ）
-// ---------------------------------------------------------
+// =========================================================
+// 6. 画像生成用のデザイン (隠しウィジェット)
+// =========================================================
 class SummaryImageWidget extends StatelessWidget {
   final int totalEarnings;
   final int totalCount;
   final int dailyGoal;
-  // 各社の売上
   final int uber, demae, wolt, rocket, menu;
 
   const SummaryImageWidget({
@@ -725,10 +701,9 @@ class SummaryImageWidget extends StatelessWidget {
       if (progress > 1.0) progress = 1.0;
     }
 
+    // MediaQueryで文字サイズを固定(1.0倍)にして、実機設定の影響を受けないようにする
     return MediaQuery(
-      data: const MediaQueryData(
-        textScaler: TextScaler.linear(1.0), // どんな端末でも文字サイズを標準に固定！
-      ),
+      data: const MediaQueryData(textScaler: TextScaler.linear(1.0)),
       child: Container(
         width: 600,
         height: 314,
@@ -741,13 +716,11 @@ class SummaryImageWidget extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            // ------------------------------------
-            // 1. メインのコンテンツ（円グラフとリスト）
-            // ------------------------------------
+            // メインコンテンツ (円グラフ & リスト)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                // --- 左側：円形プログレスバー ---
+                // 左側: 円グラフ
                 Stack(
                   alignment: Alignment.center,
                   children: [
@@ -789,8 +762,7 @@ class SummaryImageWidget extends StatelessWidget {
                     ),
                   ],
                 ),
-
-                // --- 右側：リスト部分 ---
+                // 右側: リスト
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -800,18 +772,14 @@ class SummaryImageWidget extends StatelessWidget {
                     _buildSummaryRow("Wolt", wolt, formatter),
                     _buildSummaryRow("Rocket Now", rocket, formatter),
                     _buildSummaryRow("その他", menu, formatter),
-                    // ※ここにあったロゴは削除して外に出しました
                   ],
                 ),
               ],
             ),
-
-            // ------------------------------------
-            // 2. ロゴ（右下に絶対配置！）
-            // ------------------------------------
+            // ロゴ (右下)
             Positioned(
-              right: 15, // 右端から15px
-              bottom: 15, // 下端から15px
+              right: 15,
+              bottom: 15,
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -827,15 +795,15 @@ class SummaryImageWidget extends StatelessWidget {
                 ),
               ),
             ),
-
+            // 目標額 (左上)
             Positioned(
-              left: 40, // 左から20px
-              top: 30, // 上から20px
+              left: 40,
+              top: 30,
               child: Text(
                 "目標 : ¥${formatter.format(dailyGoal)}",
                 style: const TextStyle(
-                  color: Colors.white70, // 背景に合わせて白文字
-                  fontSize: 18, // 少し大きめに強調
+                  color: Colors.white70,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),
