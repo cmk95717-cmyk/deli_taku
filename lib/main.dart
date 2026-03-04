@@ -492,14 +492,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                           _demaeCountController,
                         ),
                         const SizedBox(height: 15),
-                        _buildInputCard(
-                          "Wolt",
-                          "🦌",
-                          Colors.blue,
-                          _woltController,
-                          _woltCountController,
-                        ),
-                        const SizedBox(height: 15),
+
                         _buildInputCard(
                           "Rocket Now",
                           "🚀",
@@ -508,12 +501,23 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                           _rocketCountController,
                         ),
                         const SizedBox(height: 15),
+
                         _buildInputCard(
-                          "その他",
+                          "menu",
                           "📚",
                           Colors.green,
                           _menuController,
                           _menuCountController,
+                        ),
+
+                        const SizedBox(height: 15),
+
+                        _buildInputCard(
+                          "その他",
+                          "🥭",
+                          Colors.blue,
+                          _woltController,
+                          _woltCountController,
                         ),
                       ],
                     ),
@@ -769,9 +773,9 @@ class SummaryImageWidget extends StatelessWidget {
                   children: [
                     _buildSummaryRow("Uber Eats", uber, formatter),
                     _buildSummaryRow("出前館", demae, formatter),
-                    _buildSummaryRow("Wolt", wolt, formatter),
+                    _buildSummaryRow("menu", menu, formatter),
                     _buildSummaryRow("Rocket Now", rocket, formatter),
-                    _buildSummaryRow("その他", menu, formatter),
+                    _buildSummaryRow("その他", wolt, formatter),
                   ],
                 ),
               ],
