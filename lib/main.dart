@@ -12,6 +12,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:universal_html/html.dart' as html;
 
+import 'change_calculator_page.dart';
+
 void main() {
   runApp(const MyApp());
 }
@@ -544,6 +546,20 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ),
           ),
         ],
+      ),
+
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // ボタンを押した時の動き：新しい画面へ移動する
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ChangeCalculatorPage(),
+            ),
+          );
+        },
+        backgroundColor: Colors.teal,
+        child: const Icon(Icons.calculate, color: Colors.white),
       ),
     );
   }
