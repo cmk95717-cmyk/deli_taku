@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="deli_calc"
+        android:label="デリ卓"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
