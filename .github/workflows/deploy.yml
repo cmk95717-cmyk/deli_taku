@@ -1,0 +1,33 @@
+name: Flutter Web Deploy
+
+# 「main」ブランチに変更がプッシュされたら自動で動く設定
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: コードの読み込み
+        uses: actions/checkout@v3
+
+      - name: Flutterの準備
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: パッケージのインストール
+        run: flutter pub get
+
+      - name: Web版のビルド（deli_taku用）
+        # URLに合わせて base-href を /deli_taku/ に指定してビルドします！
+        run: flutter build web --release --base-href "/deli_taku/"
+
+      - name: GitHub Pagesへ自動アップロード
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build/web
