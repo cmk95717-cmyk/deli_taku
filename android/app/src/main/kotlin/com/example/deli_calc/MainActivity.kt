@@ -1,4 +1,4 @@
-package com.example.deli_calc
+package com.chihiro.delitaku
 
 import io.flutter.embedding.android.FlutterActivity
 

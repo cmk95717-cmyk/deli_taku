@@ -5,16 +5,19 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'dart:io' as io;
 
 // 外部パッケージ
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:universal_html/html.dart' as html;
+import 'package:path_provider/path_provider.dart';
 
 import 'change_calculator_page.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -232,9 +235,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           _imageKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
 
       // 描画待ち
-      if (boundary.debugNeedsPaint) {
-        await Future.delayed(const Duration(milliseconds: 20));
-      }
+      await Future.delayed(const Duration(milliseconds: 20));
 
       // 撮影
       ui.Image image = await boundary.toImage(pixelRatio: 3.0);
@@ -261,19 +262,18 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           context,
         ).showSnackBar(const SnackBar(content: Text('画像をダウンロードしました！')));
       } else {
-        // アプリ: シェア
-        final xFile = XFile.fromData(
-          pngBytes,
-          mimeType: 'image/png',
-          name: fileName,
-        );
-        await Share.shareXFiles([xFile], text: '本日の稼働実績🐸 #DeliTaku');
+        final directory = await getTemporaryDirectory(); // スマホの一時フォルダを取得
+        final imagePath = await io.File('${directory.path}/$fileName').create();
+        await imagePath.writeAsBytes(pngBytes); // ファイルとして書き出す
+
+        final xFile = XFile(imagePath.path, mimeType: 'image/png');
+        await Share.shareXFiles([xFile], text: '本日の稼働実績🐸 #デリ卓');
       }
     } catch (e) {
       print(e);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('アプリ版で実装予定です。もう少々お待ちください💦')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('エラー詳細: $e')));
     }
   }
 
