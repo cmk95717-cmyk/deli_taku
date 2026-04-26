@@ -34,6 +34,13 @@ class _MultiModePageState extends State<MultiModePage> {
   int totalCount = 0;
   int dailyGoal = 15000;
 
+  // カスタムラベル用の変数（初期値）
+  String labelUber = "Uber Eats";
+  String labelDemae = "出前館";
+  String labelRocket = "Rocket Now";
+  String labelMenu = "menu";
+  String labelWolt = "その他";
+
   final _uberController = TextEditingController();
   final _demaeController = TextEditingController();
   final _woltController = TextEditingController();
@@ -171,6 +178,14 @@ class _MultiModePageState extends State<MultiModePage> {
       _menuCountController.text = menuCount == 0 ? "" : menuCount.toString();
 
       dailyGoal = prefs.getInt('dailyGoal') ?? 15000;
+
+      // カスタムラベルの読み込み
+      labelUber = prefs.getString('labelUber') ?? "Uber Eats";
+      labelDemae = prefs.getString('labelDemae') ?? "出前館";
+      labelRocket = prefs.getString('labelRocket') ?? "Rocket Now";
+      labelMenu = prefs.getString('labelMenu') ?? "menu";
+      labelWolt = prefs.getString('labelWolt') ?? "その他";
+
       _calculateTotal();
     });
   }
@@ -178,6 +193,44 @@ class _MultiModePageState extends State<MultiModePage> {
   // ---------------------------------------------------
   // 4. アクション
   // ---------------------------------------------------
+
+  // ラベルの名前を変更するダイアログ
+  Future<void> _showEditLabelDialog(
+    String currentLabel,
+    String key,
+    Function(String) onSaved,
+  ) async {
+    final controller = TextEditingController(text: currentLabel);
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('サービス名を変更'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(hintText: "例：ウーバー、Woltなど"),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString(key, controller.text); // スマホに保存
+                onSaved(controller.text); // 画面の変数を更新
+                Navigator.pop(context);
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _captureAndSaveImage() async {
     try {
       RenderRepaintBoundary boundary =
@@ -281,6 +334,12 @@ class _MultiModePageState extends State<MultiModePage> {
               wolt: int.tryParse(_woltController.text) ?? 0,
               rocket: int.tryParse(_rocketController.text) ?? 0,
               menu: int.tryParse(_menuController.text) ?? 0,
+              // カスタムラベルを画像生成ウィジェットにも渡す
+              labelUber: labelUber,
+              labelDemae: labelDemae,
+              labelRocket: labelRocket,
+              labelMenu: labelMenu,
+              labelWolt: labelWolt,
             ),
           ),
           Container(
@@ -410,43 +469,63 @@ class _MultiModePageState extends State<MultiModePage> {
                     child: Column(
                       children: [
                         _buildInputCard(
-                          "Uber Eats",
-                          "🐸",
+                          labelUber,
                           Colors.green,
                           _uberController,
                           _uberCountController,
+                          () => _showEditLabelDialog(
+                            labelUber,
+                            'labelUber',
+                            (val) => setState(() => labelUber = val),
+                          ),
                         ),
                         const SizedBox(height: 10),
                         _buildInputCard(
-                          "出前館",
-                          "🥫",
+                          labelDemae,
                           Colors.red,
                           _demaeController,
                           _demaeCountController,
+                          () => _showEditLabelDialog(
+                            labelDemae,
+                            'labelDemae',
+                            (val) => setState(() => labelDemae = val),
+                          ),
                         ),
                         const SizedBox(height: 10),
                         _buildInputCard(
-                          "Rocket Now",
-                          "🚀",
+                          labelRocket,
                           Colors.orange,
                           _rocketController,
                           _rocketCountController,
+                          () => _showEditLabelDialog(
+                            labelRocket,
+                            'labelRocket',
+                            (val) => setState(() => labelRocket = val),
+                          ),
                         ),
                         const SizedBox(height: 10),
                         _buildInputCard(
-                          "menu",
-                          "📚",
+                          labelMenu,
                           Colors.green,
                           _menuController,
                           _menuCountController,
+                          () => _showEditLabelDialog(
+                            labelMenu,
+                            'labelMenu',
+                            (val) => setState(() => labelMenu = val),
+                          ),
                         ),
                         const SizedBox(height: 10),
                         _buildInputCard(
-                          "その他",
-                          "🥭",
+                          labelWolt, // ※変数はwoltControllerを使っていますが、初期値は「その他」です
                           Colors.blue,
                           _woltController,
                           _woltCountController,
+                          () => _showEditLabelDialog(
+                            labelWolt,
+                            'labelWolt',
+                            (val) => setState(() => labelWolt = val),
+                          ),
                         ),
                       ],
                     ),
@@ -500,12 +579,13 @@ class _MultiModePageState extends State<MultiModePage> {
     );
   }
 
+  // 絵文字アイコンを廃止し、タイトルテキストのみに変更
   Widget _buildInputCard(
     String title,
-    String emoji,
-    Color accentColor,
+    Color accentColor, // テキストの色に反映
     TextEditingController moneyController,
     TextEditingController countController,
+    VoidCallback onEditTitle, // タイトルタップイベント
   ) {
     return Card(
       elevation: 4,
@@ -515,25 +595,35 @@ class _MultiModePageState extends State<MultiModePage> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         child: Row(
           children: [
-            Container(
-              width: 45,
-              height: 45,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(emoji, style: const TextStyle(fontSize: 22)),
-            ),
-            const SizedBox(width: 15),
+            // 絵文字アイコンを表示していたContainerとSizedBoxを削除
             Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+              // インクウェルで囲んでタップ可能にし、ペンマークを追加
+              child: InkWell(
+                onTap: onEditTitle,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8.0,
+                    horizontal: 4.0,
+                  ), // 左側のパディングを調整
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: accentColor, // 絵文字の色をテキストに継承
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.edit, size: 14, color: Colors.grey),
+                    ],
+                  ),
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
             ),
             SizedBox(
@@ -606,6 +696,8 @@ class SummaryImageWidget extends StatelessWidget {
   final int totalCount;
   final int dailyGoal;
   final int uber, demae, wolt, rocket, menu;
+  // 画像ウィジェットもカスタムラベルを受け取る
+  final String labelUber, labelDemae, labelRocket, labelMenu, labelWolt;
 
   const SummaryImageWidget({
     super.key,
@@ -617,6 +709,11 @@ class SummaryImageWidget extends StatelessWidget {
     required this.wolt,
     required this.rocket,
     required this.menu,
+    required this.labelUber,
+    required this.labelDemae,
+    required this.labelRocket,
+    required this.labelMenu,
+    required this.labelWolt,
   });
 
   @override
@@ -684,11 +781,12 @@ class SummaryImageWidget extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildServiceItem("Uber", uber, formatter),
-                    _buildServiceItem("出前館", demae, formatter),
-                    _buildServiceItem("menu", menu, formatter),
-                    _buildServiceItem("Rocket", rocket, formatter),
-                    _buildServiceItem("その他", wolt, formatter),
+                    // カスタムラベルを反映
+                    _buildServiceItem(labelUber, uber, formatter),
+                    _buildServiceItem(labelDemae, demae, formatter),
+                    _buildServiceItem(labelMenu, menu, formatter),
+                    _buildServiceItem(labelRocket, rocket, formatter),
+                    _buildServiceItem(labelWolt, wolt, formatter),
                   ],
                 ),
               ),
@@ -777,7 +875,16 @@ class SummaryImageWidget extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(name, style: const TextStyle(color: Colors.white60, fontSize: 11)),
+        // 長い名前が設定されてもはみ出ないように対応
+        SizedBox(
+          width: 50,
+          child: Text(
+            name,
+            style: const TextStyle(color: Colors.white60, fontSize: 11),
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
         const SizedBox(height: 5),
         Text(
           "¥${formatter.format(amount)}",
